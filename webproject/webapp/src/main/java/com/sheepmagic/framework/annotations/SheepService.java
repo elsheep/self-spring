@@ -1,4 +1,4 @@
-package com.sheepmagic.selfspring.annotation;
+package com.sheepmagic.framework.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;
@@ -7,6 +7,6 @@ import java.lang.annotation.RetentionPolicy;
 
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface SheepController {
+public @interface SheepService {
 	String value() default "";
 }
