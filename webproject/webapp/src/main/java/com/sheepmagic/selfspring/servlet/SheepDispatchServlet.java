@@ -7,11 +7,14 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -29,7 +32,8 @@ public class SheepDispatchServlet extends HttpServlet{
 	private Properties contextConfig = new Properties();
 	private List<String> classNames = new ArrayList<String>();
 	private Map<String, Object> ioc = new HashMap<String, Object>();
-	private Map<String, Method> handlerMapping = new HashMap<String, Method>();
+//	private Map<String, Handler> handlerMapping = new HashMap<String, Handler>();
+	private List<Handler> handlerMapping = new ArrayList<Handler>();
 	
 
 	/**
@@ -46,17 +50,7 @@ public class SheepDispatchServlet extends HttpServlet{
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 		// TODO Auto-generated method stub
 //		super.doPost(req, resp);
-		String url = req.getRequestURI();
-		String contextPath = req.getContextPath();
-		url = url.replace(contextPath, "").replaceAll("/+", "/");
-		System.out.println("Url : " + url);
-		if(handlerMapping.containsKey(url)){
-			Method m = handlerMapping.get(url);
-			req.getParameter("name");
-		}else{
-			resp.getWriter().write("404");
-			return;
-		}
+		doDispatch(req, resp);
 	}
 	
 	@Override
@@ -189,12 +183,54 @@ public class SheepDispatchServlet extends HttpServlet{
 					if(!m.isAnnotationPresent(SheepRequestMapping.class)){
 						continue;
 					}
-					String url = m.getAnnotation(SheepRequestMapping.class).value();
-					url = (baseUrl + url).replaceAll("/+", "/");
-					handlerMapping.put(url, m);
-					System.out.println(url + "  " + m.getName());
+					String regex = m.getAnnotation(SheepRequestMapping.class).value();
+					regex = (baseUrl + regex).replaceAll("/+", "/");
+					Pattern pattern = Pattern.compile(regex);
+					handlerMapping.add(new Handler(entry.getValue(), m, pattern));
+					System.out.println(regex + "  " + m.getName());
 				}
 			}
+		}
+	}
+	
+	public void doDispatch(HttpServletRequest req, HttpServletResponse resp) throws Exception{
+		Handler handler = getHandler(req);
+		if(handler == null){
+			resp.getWriter().write("404");
+		}else{
+			Class<?> [] paramTypes = handler.method.getParameterTypes();
+			Object [] paramValues = new Object[paramTypes.length];
+			Map<String, String[]> params = req.getParameterMap();
+			for(Entry<String, String[]> param : params.entrySet()){
+				System.out.println(param.getValue());
+				String value = Arrays.toString(param.getValue()).replaceAll("\\[|\\]", "").replaceAll("\\s", "");
+				if(!handler.paramIndexMapping.containsKey(param.getKey())){
+					continue;
+				}
+			}
+		}
+	}
+	
+	public Handler getHandler(HttpServletRequest req){
+		if(handlerMapping.isEmpty()){
+			return null;
+		}else{
+			String url = req.getRequestURI();
+			String contextPath = req.getContextPath();
+			url = url.replace(contextPath, "").replaceAll("/+", "/");
+			for(Handler handler : handlerMapping){
+				try{
+					Matcher matcher = handler.getPattern().matcher(url);
+					if(!matcher.matches()){
+						continue;
+					}else{
+						return handler;
+					}
+				}catch(Exception e){
+					e.printStackTrace();
+				}
+			}
+			return null;
 		}
 	}
 	
